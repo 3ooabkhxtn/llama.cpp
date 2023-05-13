@@ -1087,9 +1087,9 @@ for (int i = 0; i < nb; i++) {
         maxAbs = _mm_max_ps( maxAbs, _mm_andnot_ps( signBit, v6 ) );
         maxAbs = _mm_max_ps( maxAbs, _mm_andnot_ps( signBit, v7 ) );
 
-        __m128 max4 = _mm_max_ps( maxAbs, maxAbs );
-        max4 = _mm_max_ps( max4, _mm_movehl_ps( max4, max4 ) );
-        max4 = _mm_max_ss( max4, _mm_movehdup_ps( max4 ) );
+        __m128 max4   = _mm_max_ps( maxAbs, _mm_movehl_ps( maxAbs, maxAbs ) );
+        __m128 max4_s = (__m128)_mm_shuffle_epi32((__m128i)max4, _MM_SHUFFLE(2, 3, 0, 1));
+        max4          = _mm_max_ps(max4, max4_s);
         const float maxScalar = _mm_cvtss_f32( max4 );
 
         // Quantize these floats
@@ -1097,6 +1097,17 @@ for (int i = 0; i < nb; i++) {
         y[i].d = d;
         const float id = ( maxScalar != 0.0f ) ? 127.f / maxScalar : 0.0f;
         const __m128 mul = _mm_set1_ps( id );
+
+        /*
+
+        __m128 div      = _mm_set1_ps(127.f);
+        __m128 zero     = _mm_set1_ps(0.0f);
+        __m128 id       = _mm_div_ps(div, max4_4);
+        __m128 mask_vec = _mm_cmpneq_ps(max4_4, zero);
+
+        const __m128 mul = _mm_blendv_ps(zero, id, mask_vec);
+
+        */
 
         // Apply the multiplier
         v0 = _mm_mul_ps( v0, mul );
