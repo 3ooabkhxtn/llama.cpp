@@ -3148,6 +3148,37 @@ static void ggml_vec_dot_q8_0_q8_0(const int n, float * restrict s, const void *
     }
 
     *s = hsum_float_8(acc);
+#elif defined(__SSE3__)
+    // work here
+    // Initialize accumulator with zeros
+    __m128 acc = _mm_setzero_ps();
+
+    // Main loop
+    for (int i = 0; i < nb; ++i) {
+        // Compute combined scale for the block
+        int sumi_0 = 0;
+        int sumi_1 = 0;
+        int sumi_2 = 0;
+        int sumi_3 = 0;
+
+        const __m128 d = _mm_mul_ps( _mm_set1_ps( x[i].d ), _mm_set1_ps( y[i].d ) );
+
+        for (int j = 0; j < qk; j+=4) {
+            sumi_0 += x[i].qs[j]*y[i].qs[j];
+            sumi_1 += x[i].qs[j + 1]*y[i].qs[j + 1];
+            sumi_2 += x[i].qs[j + 2]*y[i].qs[j + 2];
+            sumi_3 += x[i].qs[j + 3]*y[i].qs[j + 3];
+        }
+
+        __m128 tmp = _mm_cvtepi32_ps(_mm_set_epi32(sumi_0, sumi_1, sumi_2, sumi_3));
+
+        acc = _mm_add_ps(_mm_mul_ps(d, tmp), acc);
+    }
+
+    acc =_mm_hadd_ps(acc, acc);
+    acc =_mm_hadd_ps(acc, acc);
+
+    *s = _mm_cvtss_f32(acc);
 #else
     // scalar
     float sumf = 0.0;
