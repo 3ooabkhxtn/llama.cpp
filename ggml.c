@@ -3156,23 +3156,53 @@ static void ggml_vec_dot_q8_0_q8_0(const int n, float * restrict s, const void *
     // Main loop
     for (int i = 0; i < nb; ++i) {
         // Compute combined scale for the block
-        int sumi_0 = 0;
-        int sumi_1 = 0;
-        int sumi_2 = 0;
-        int sumi_3 = 0;
+        int32_t x_b[qk];
+        int32_t y_b[qk];
 
         const __m128 d = _mm_mul_ps( _mm_set1_ps( x[i].d ), _mm_set1_ps( y[i].d ) );
 
-        for (int j = 0; j < qk; j+=4) {
-            sumi_0 += x[i].qs[j]*y[i].qs[j];
-            sumi_1 += x[i].qs[j + 1]*y[i].qs[j + 1];
-            sumi_2 += x[i].qs[j + 2]*y[i].qs[j + 2];
-            sumi_3 += x[i].qs[j + 3]*y[i].qs[j + 3];
+        for (int j = 0; j < qk; j++) {
+            x_b[j] = x[i].qs[j];
+            y_b[j] = y[i].qs[j];
         }
 
-        __m128 tmp = _mm_cvtepi32_ps(_mm_set_epi32(sumi_0, sumi_1, sumi_2, sumi_3));
+        __m128 bx_0 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b)));
+        __m128 bx_1 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b +  4)));
+        __m128 bx_2 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b +  8)));
+        __m128 bx_3 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 12)));
+        __m128 bx_4 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 16)));
+        __m128 bx_5 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 20)));
+        __m128 bx_6 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 24)));
+        __m128 bx_7 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 28)));
 
-        acc = _mm_add_ps(_mm_mul_ps(d, tmp), acc);
+        __m128 by_0 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b)));
+        __m128 by_1 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b +  4)));
+        __m128 by_2 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b +  8)));
+        __m128 by_3 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 12)));
+        __m128 by_4 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 16)));
+        __m128 by_5 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 20)));
+        __m128 by_6 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 24)));
+        __m128 by_7 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 28)));
+
+        __m128 f32_0 = _mm_mul_ps(bx_0, by_0);
+        __m128 f32_1 = _mm_mul_ps(bx_1, by_1);
+        __m128 f32_2 = _mm_mul_ps(bx_2, by_2);
+        __m128 f32_3 = _mm_mul_ps(bx_3, by_3);
+        __m128 f32_4 = _mm_mul_ps(bx_4, by_4);
+        __m128 f32_5 = _mm_mul_ps(bx_5, by_5);
+        __m128 f32_6 = _mm_mul_ps(bx_6, by_6);
+        __m128 f32_7 = _mm_mul_ps(bx_7, by_7);
+
+        __m128 f32 = f32_0;
+        f32 = _mm_add_ps(f32, f32_1);
+        f32 = _mm_add_ps(f32, f32_2);
+        f32 = _mm_add_ps(f32, f32_3);
+        f32 = _mm_add_ps(f32, f32_4);
+        f32 = _mm_add_ps(f32, f32_5);
+        f32 = _mm_add_ps(f32, f32_6);
+        f32 = _mm_add_ps(f32, f32_7);
+
+        acc = _mm_add_ps(_mm_mul_ps(d, f32), acc);
     }
 
     acc =_mm_hadd_ps(acc, acc);
