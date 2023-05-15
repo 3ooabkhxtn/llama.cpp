@@ -654,6 +654,14 @@ static inline __m128i packNibbles( __m128i bytes1, __m128i bytes2 )
 }
 #endif
 #elif defined(__SSSE3__)
+// horizontally add 4 floats
+static inline float hsum_float_4(const __m128 a) {
+    __m128 res =_mm_hadd_ps(a, a);
+    res =_mm_hadd_ps(res, res);
+
+    return _mm_cvtss_f32(res);
+}
+
 // horizontally add 4x4 floats
 static inline float hsum_float_4x4(const __m128 a, const __m128 b, const __m128 c, const __m128 d) {
     __m128 res_0 =_mm_hadd_ps(a, b);
@@ -3148,67 +3156,36 @@ static void ggml_vec_dot_q8_0_q8_0(const int n, float * restrict s, const void *
     }
 
     *s = hsum_float_8(acc);
-#elif defined(__SSE3__)
+#elif defined(__SSSE3__)
     // work here
     // Initialize accumulator with zeros
     __m128 acc = _mm_setzero_ps();
 
     // Main loop
     for (int i = 0; i < nb; ++i) {
-        // Compute combined scale for the block
-        int32_t x_b[qk];
-        int32_t y_b[qk];
+        // Prefetch
+        _mm_prefetch(&x[i] + sizeof(block_q8_0), _MM_HINT_T0);
+        _mm_prefetch(&y[i] + sizeof(block_q8_0), _MM_HINT_T0);
 
+        // Compute combined scale for the block
         const __m128 d = _mm_mul_ps( _mm_set1_ps( x[i].d ), _mm_set1_ps( y[i].d ) );
 
-        for (int j = 0; j < qk; j++) {
-            x_b[j] = x[i].qs[j];
-            y_b[j] = y[i].qs[j];
-        }
+        const __m128i bx_0 = _mm_loadu_si128((const __m128i *)x[i].qs);
+        const __m128i by_0 = _mm_loadu_si128((const __m128i *)y[i].qs);
+        const __m128i bx_1 = _mm_loadu_si128((const __m128i *)(x[i].qs + 16));
+        const __m128i by_1 = _mm_loadu_si128((const __m128i *)(y[i].qs + 16));
 
-        __m128 bx_0 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b)));
-        __m128 bx_1 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b +  4)));
-        __m128 bx_2 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b +  8)));
-        __m128 bx_3 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 12)));
-        __m128 bx_4 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 16)));
-        __m128 bx_5 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 20)));
-        __m128 bx_6 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 24)));
-        __m128 bx_7 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(x_b + 28)));
+        const __m128i i32_0 =  mul_sum_i8_pairs(bx_0, by_0);
+        const __m128i i32_1 =  mul_sum_i8_pairs(bx_1, by_1);
 
-        __m128 by_0 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b)));
-        __m128 by_1 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b +  4)));
-        __m128 by_2 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b +  8)));
-        __m128 by_3 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 12)));
-        __m128 by_4 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 16)));
-        __m128 by_5 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 20)));
-        __m128 by_6 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 24)));
-        __m128 by_7 = _mm_cvtepi32_ps(_mm_loadu_si128((const __m128i *)(y_b + 28)));
+        const __m128 f32_0 = _mm_cvtepi32_ps(i32_0);
+        const __m128 f32_1 = _mm_cvtepi32_ps(i32_1);
 
-        __m128 f32_0 = _mm_mul_ps(bx_0, by_0);
-        __m128 f32_1 = _mm_mul_ps(bx_1, by_1);
-        __m128 f32_2 = _mm_mul_ps(bx_2, by_2);
-        __m128 f32_3 = _mm_mul_ps(bx_3, by_3);
-        __m128 f32_4 = _mm_mul_ps(bx_4, by_4);
-        __m128 f32_5 = _mm_mul_ps(bx_5, by_5);
-        __m128 f32_6 = _mm_mul_ps(bx_6, by_6);
-        __m128 f32_7 = _mm_mul_ps(bx_7, by_7);
-
-        __m128 f32 = f32_0;
-        f32 = _mm_add_ps(f32, f32_1);
-        f32 = _mm_add_ps(f32, f32_2);
-        f32 = _mm_add_ps(f32, f32_3);
-        f32 = _mm_add_ps(f32, f32_4);
-        f32 = _mm_add_ps(f32, f32_5);
-        f32 = _mm_add_ps(f32, f32_6);
-        f32 = _mm_add_ps(f32, f32_7);
-
-        acc = _mm_add_ps(_mm_mul_ps(d, f32), acc);
+        // Multiply q with scale and accumulate
+        acc = _mm_add_ps(_mm_mul_ps(d, _mm_add_ps(f32_0, f32_1)), acc);
     }
 
-    acc =_mm_hadd_ps(acc, acc);
-    acc =_mm_hadd_ps(acc, acc);
-
-    *s = _mm_cvtss_f32(acc);
+    *s = hsum_float_4(acc);
 #else
     // scalar
     float sumf = 0.0;
