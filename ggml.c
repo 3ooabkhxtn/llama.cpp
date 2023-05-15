@@ -1143,9 +1143,8 @@ for (int i = 0; i < nb; i++) {
         maxAbs = _mm_max_ps( maxAbs, _mm_andnot_ps( signBit, v6 ) );
         maxAbs = _mm_max_ps( maxAbs, _mm_andnot_ps( signBit, v7 ) );
 
-        __m128 max4   = _mm_max_ps( maxAbs, _mm_movehl_ps( maxAbs, maxAbs ) );
-        __m128 max4_s = (__m128)_mm_shuffle_epi32((__m128i)max4, _MM_SHUFFLE(2, 3, 0, 1));
-        max4          = _mm_max_ps(max4, max4_s);
+        __m128 max4 = _mm_max_ps( maxAbs, _mm_movehl_ps( maxAbs, maxAbs ) );
+        max4 = _mm_max_ss( max4, _mm_movehdup_ps( max4 ) );
         const float maxScalar = _mm_cvtss_f32( max4 );
 
         // Quantize these floats
@@ -1155,6 +1154,10 @@ for (int i = 0; i < nb; i++) {
         const __m128 mul = _mm_set1_ps( id );
 
         /*
+
+        __m128 max4   = _mm_max_ps( maxAbs, _mm_movehl_ps( maxAbs, maxAbs ) );
+        __m128 max4_s = (__m128)_mm_shuffle_epi32((__m128i)max4, _MM_SHUFFLE(2, 3, 0, 1));
+        max4          = _mm_max_ps(max4, max4_s);
 
         __m128 div      = _mm_set1_ps(127.f);
         __m128 zero     = _mm_set1_ps(0.0f);
