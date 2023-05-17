@@ -1698,8 +1698,53 @@ static void dequantize_row_q8_0(const void * restrict vx, float * restrict y, in
 
     const block_q8_0 * restrict x = vx;
 
+#if defined(__SSSE3__)
     // SSE tbd
+    assert(qk == 32);
 
+    __m128 fx[8];
+
+    int j = 0;
+    for (int i = 0; i < nb; i++) {
+        const __m128 d = _mm_set1_ps(x[i].d);
+
+        const __m128i x0 = _mm_loadu_si128((const __m128i *)(x[i].qs));
+        const __m128i x1 = _mm_loadu_si128((const __m128i *)(x[i].qs + 16));
+
+        const __m128i x0_0 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(0, 0, 0, 0));
+        const __m128i x0_1 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(1, 1, 1, 1));
+        const __m128i x0_2 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(2, 2, 2, 2));
+        const __m128i x0_3 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(3, 3, 3, 3));
+
+        const __m128i x1_0 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(0, 0, 0, 0));
+        const __m128i x1_1 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(1, 1, 1, 1));
+        const __m128i x1_2 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(2, 2, 2, 2));
+        const __m128i x1_3 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(3, 3, 3, 3));
+
+        fx[0] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_0));
+        fx[1] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_1));
+        fx[2] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_2));
+        fx[3] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_3));
+        fx[4] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_0));
+        fx[5] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_1));
+        fx[6] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_2));
+        fx[7] = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_3));
+
+        _mm_prefetch(&x[i] + sizeof(block_q8_0), _MM_HINT_T0);
+
+        fx[0] = _mm_mul_ps(fx[0], d);
+        fx[1] = _mm_mul_ps(fx[1], d);
+        fx[2] = _mm_mul_ps(fx[2], d);
+        fx[3] = _mm_mul_ps(fx[3], d);
+        fx[4] = _mm_mul_ps(fx[4], d);
+        fx[5] = _mm_mul_ps(fx[5], d);
+        fx[6] = _mm_mul_ps(fx[6], d);
+        fx[7] = _mm_mul_ps(fx[7], d);
+
+        memcpy(y + j, fx, 8 * sizeof(__m128));
+        j += 32;
+    }
+#else
     for (int i = 0; i < nb; i++) {
         const float d = x[i].d;
 
@@ -1707,6 +1752,7 @@ static void dequantize_row_q8_0(const void * restrict vx, float * restrict y, in
             y[i*qk + j] = x[i].qs[j]*d;
         }
     }
+#endif
 }
 
 static void ggml_vec_dot_q4_0_q8_0(const int n, float * restrict s, const void * restrict vx, const void * restrict vy);
