@@ -1487,25 +1487,29 @@ static void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict 
     static const int qk = QK4_0;
 
     assert(k % qk == 0);
-    assert(qk == 32);
 
     const int nb = k / qk;
 
 #if defined(__SSSE3__)
     // sse tbd
+    assert(qk == 32);
+
+    const __m128i lowMask  = _mm_set1_epi8(0x0F);
+    const __m128i off = _mm_set1_epi8(8);
+
+    __m128 fx[8];
+
     int j = 0;
     for (int i = 0; i < nb; i++) {
-        const __m128i lowMask  = _mm_set1_epi8(0x0F);
-        const __m128i off = _mm_set1_epi8(8);
-
         __m128 d = _mm_set1_ps(x[i].d);
 
         __m128i x_ = _mm_loadu_si128((const __m128i *)(x[i].qs));
 
-        // byte order is no right, after separating
-
         __m128i x0 = _mm_and_si128(lowMask, x_);
         __m128i x1 = _mm_and_si128(lowMask, _mm_srli_epi64(x_, 4));
+
+        x0 = _mm_sub_epi8(x0, off);
+        x1 = _mm_sub_epi8(x1, off);
 
         __m128i x0_0 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(0, 0, 0, 0));
         __m128i x0_1 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(1, 1, 1, 1));
@@ -1517,16 +1521,6 @@ static void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict 
         __m128i x1_2 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(2, 2, 2, 2));
         __m128i x1_3 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(3, 3, 3, 3));
 
-        x0_0 = _mm_sub_epi32(x0_0, off);
-        x0_1 = _mm_sub_epi32(x0_1, off);
-        x0_2 = _mm_sub_epi32(x0_2, off);
-        x0_3 = _mm_sub_epi32(x0_3, off);
-
-        x1_0 = _mm_sub_epi32(x1_0, off);
-        x1_1 = _mm_sub_epi32(x1_1, off);
-        x1_2 = _mm_sub_epi32(x1_2, off);
-        x1_3 = _mm_sub_epi32(x1_3, off);
-
         __m128 fx0_0 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_0));
         __m128 fx0_1 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_1));
         __m128 fx0_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_2));
@@ -1537,26 +1531,19 @@ static void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict 
         __m128 fx1_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_2));
         __m128 fx1_3 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_3));
 
-        fx0_0 = _mm_mul_ps(fx0_0, d);
-        fx0_1 = _mm_mul_ps(fx0_1, d);
-        fx0_2 = _mm_mul_ps(fx0_2, d);
-        fx0_3 = _mm_mul_ps(fx0_3, d);
+        _mm_prefetch(&x[i] + sizeof(block_q4_0), _MM_HINT_T0);
 
-        fx1_0 = _mm_mul_ps(fx1_0, d);
-        fx1_1 = _mm_mul_ps(fx1_1, d);
-        fx1_2 = _mm_mul_ps(fx1_2, d);
-        fx1_3 = _mm_mul_ps(fx1_3, d);
+        fx[0] = _mm_mul_ps(fx0_0, d);
+        fx[1] = _mm_mul_ps(fx0_1, d);
+        fx[2] = _mm_mul_ps(fx0_2, d);
+        fx[3] = _mm_mul_ps(fx0_3, d);
+        fx[4] = _mm_mul_ps(fx1_0, d);
+        fx[5] = _mm_mul_ps(fx1_1, d);
+        fx[6] = _mm_mul_ps(fx1_2, d);
+        fx[7] = _mm_mul_ps(fx1_3, d);
 
-        _mm_store_ps(y + j +  0, fx0_0);
-        _mm_store_ps(y + j +  4, fx0_1);
-        _mm_store_ps(y + j +  8, fx0_2);
-        _mm_store_ps(y + j + 12, fx0_3);
-        _mm_store_ps(y + j + 16, fx1_0);
-        _mm_store_ps(y + j + 20, fx1_1);
-        _mm_store_ps(y + j + 24, fx1_2);
-        _mm_store_ps(y + j + 28, fx1_3);
-
-        j+=32;
+        memcpy(y + j, fx, 8 * sizeof(__m128));
+        j += 32;
     }
 #else
     // Scalar
