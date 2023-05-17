@@ -1127,7 +1127,7 @@ static void quantize_row_q8_0(const float * restrict x, void * restrict vy, int 
         _mm_storeu_si128((__m128i *)(y[i].qs + 16), ni4);
 #endif
     }
-#elif defined(__SSE3__)
+#elif defined(__SSSE3__)
 for (int i = 0; i < nb; i++) {
         // Load elements into 4 AVX vectors
         __m128 v0 = _mm_loadu_ps( x );
