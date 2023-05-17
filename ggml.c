@@ -1501,9 +1501,9 @@ static void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict 
 
     int j = 0;
     for (int i = 0; i < nb; i++) {
-        __m128 d = _mm_set1_ps(x[i].d);
+        const __m128 d = _mm_set1_ps(x[i].d);
 
-        __m128i x_ = _mm_loadu_si128((const __m128i *)(x[i].qs));
+        const __m128i x_ = _mm_loadu_si128((const __m128i *)(x[i].qs));
 
         __m128i x0 = _mm_and_si128(lowMask, x_);
         __m128i x1 = _mm_and_si128(lowMask, _mm_srli_epi64(x_, 4));
@@ -1511,25 +1511,25 @@ static void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict 
         x0 = _mm_sub_epi8(x0, off);
         x1 = _mm_sub_epi8(x1, off);
 
-        __m128i x0_0 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(0, 0, 0, 0));
-        __m128i x0_1 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(1, 1, 1, 1));
-        __m128i x0_2 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(2, 2, 2, 2));
-        __m128i x0_3 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(3, 3, 3, 3));
+        const __m128i x0_0 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(0, 0, 0, 0));
+        const __m128i x0_1 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(1, 1, 1, 1));
+        const __m128i x0_2 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(2, 2, 2, 2));
+        const __m128i x0_3 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(3, 3, 3, 3));
 
-        __m128i x1_0 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(0, 0, 0, 0));
-        __m128i x1_1 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(1, 1, 1, 1));
-        __m128i x1_2 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(2, 2, 2, 2));
-        __m128i x1_3 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(3, 3, 3, 3));
+        const __m128i x1_0 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(0, 0, 0, 0));
+        const __m128i x1_1 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(1, 1, 1, 1));
+        const __m128i x1_2 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(2, 2, 2, 2));
+        const __m128i x1_3 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(3, 3, 3, 3));
 
-        __m128 fx0_0 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_0));
-        __m128 fx0_1 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_1));
-        __m128 fx0_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_2));
-        __m128 fx0_3 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_3));
+        const __m128 fx0_0 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_0));
+        const __m128 fx0_1 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_1));
+        const __m128 fx0_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_2));
+        const __m128 fx0_3 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_3));
 
-        __m128 fx1_0 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_0));
-        __m128 fx1_1 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_1));
-        __m128 fx1_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_2));
-        __m128 fx1_3 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_3));
+        const __m128 fx1_0 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_0));
+        const __m128 fx1_1 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_1));
+        const __m128 fx1_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_2));
+        const __m128 fx1_3 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_3));
 
         _mm_prefetch(&x[i] + sizeof(block_q4_0), _MM_HINT_T0);
 
@@ -1568,6 +1568,59 @@ static void dequantize_row_q4_1(const block_q4_1 * restrict x, float * restrict 
 
     const int nb = k / qk;
 
+#if defined(__SSSE3__)
+    // sse tbd
+    assert(qk == 32);
+
+    const __m128i lowMask  = _mm_set1_epi8(0x0F);
+
+    __m128 fx[8];
+
+    int j = 0;
+    for (int i = 0; i < nb; i++) {
+        const __m128 d = _mm_set1_ps(x[i].d);
+        const __m128 m = _mm_set1_ps(x[i].m);
+
+        const __m128i x_ = _mm_loadu_si128((const __m128i *)(x[i].qs));
+
+        __m128i x0 = _mm_and_si128(lowMask, x_);
+        __m128i x1 = _mm_and_si128(lowMask, _mm_srli_epi64(x_, 4));
+
+        const __m128i x0_0 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(0, 0, 0, 0));
+        const __m128i x0_1 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(1, 1, 1, 1));
+        const __m128i x0_2 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(2, 2, 2, 2));
+        const __m128i x0_3 = _mm_shuffle_epi32(x0, _MM_SHUFFLE(3, 3, 3, 3));
+
+        const __m128i x1_0 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(0, 0, 0, 0));
+        const __m128i x1_1 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(1, 1, 1, 1));
+        const __m128i x1_2 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(2, 2, 2, 2));
+        const __m128i x1_3 = _mm_shuffle_epi32(x1, _MM_SHUFFLE(3, 3, 3, 3));
+
+        const __m128 fx0_0 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_0));
+        const __m128 fx0_1 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_1));
+        const __m128 fx0_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_2));
+        const __m128 fx0_3 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x0_3));
+
+        const __m128 fx1_0 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_0));
+        const __m128 fx1_1 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_1));
+        const __m128 fx1_2 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_2));
+        const __m128 fx1_3 = _mm_cvtpi8_ps(_mm_movepi64_pi64(x1_3));
+
+        _mm_prefetch(&x[i] + sizeof(block_q4_0), _MM_HINT_T0);
+
+        fx[0] = _mm_add_ps(_mm_mul_ps(fx0_0, d), m);
+        fx[1] = _mm_add_ps(_mm_mul_ps(fx0_1, d), m);
+        fx[2] = _mm_add_ps(_mm_mul_ps(fx0_2, d), m);
+        fx[3] = _mm_add_ps(_mm_mul_ps(fx0_3, d), m);
+        fx[4] = _mm_add_ps(_mm_mul_ps(fx1_0, d), m);
+        fx[5] = _mm_add_ps(_mm_mul_ps(fx1_1, d), m);
+        fx[6] = _mm_add_ps(_mm_mul_ps(fx1_2, d), m);
+        fx[7] = _mm_add_ps(_mm_mul_ps(fx1_3, d), m);
+
+        memcpy(y + j, fx, 8 * sizeof(__m128));
+        j += 32;
+    }
+#else
     for (int i = 0; i < nb; i++) {
         const float d = x[i].d;
         const float m = x[i].m;
@@ -1580,6 +1633,7 @@ static void dequantize_row_q4_1(const block_q4_1 * restrict x, float * restrict 
             y[i*qk + j + qk/2] = x1*d + m;
         }
     }
+#endif
 }
 
 static void dequantize_row_q5_0(const block_q5_0 * restrict x, float * restrict y, int k) {
@@ -1643,6 +1697,8 @@ static void dequantize_row_q8_0(const void * restrict vx, float * restrict y, in
     const int nb = k / qk;
 
     const block_q8_0 * restrict x = vx;
+
+    // SSE tbd
 
     for (int i = 0; i < nb; i++) {
         const float d = x[i].d;
