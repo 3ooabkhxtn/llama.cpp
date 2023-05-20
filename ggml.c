@@ -1150,7 +1150,7 @@ static void quantize_row_q8_0(const float * restrict x, void * restrict vy, int 
     }
 #elif defined(__SSSE3__)
 for (int i = 0; i < nb; i++) {
-        // Load elements into 4 AVX vectors
+        // Load elements into 8 SSE vectors
         __m128 v0 = _mm_loadu_ps( x );
         __m128 v1 = _mm_loadu_ps( x + 4 );
         __m128 v2 = _mm_loadu_ps( x + 8 );
@@ -1181,21 +1181,6 @@ for (int i = 0; i < nb; i++) {
         y[i].d = GGML_FP32_TO_FP16(d);
         const float id = ( maxScalar != 0.0f ) ? 127.f / maxScalar : 0.0f;
         const __m128 mul = _mm_set1_ps( id );
-
-        /*
-
-        __m128 max4   = _mm_max_ps( maxAbs, _mm_movehl_ps( maxAbs, maxAbs ) );
-        __m128 max4_s = (__m128)_mm_shuffle_epi32((__m128i)max4, _MM_SHUFFLE(2, 3, 0, 1));
-        max4          = _mm_max_ps(max4, max4_s);
-
-        __m128 div      = _mm_set1_ps(127.f);
-        __m128 zero     = _mm_set1_ps(0.0f);
-        __m128 id       = _mm_div_ps(div, max4_4);
-        __m128 mask_vec = _mm_cmpneq_ps(max4_4, zero);
-
-        const __m128 mul = _mm_blendv_ps(zero, id, mask_vec);
-
-        */
 
         // Apply the multiplier
         v0 = _mm_mul_ps( v0, mul );
@@ -1416,10 +1401,8 @@ static void quantize_row_q8_1(const float * restrict x, void * restrict vy, int 
 #endif
     }
 #elif defined(__SSSE__)
-    // SSE tbd
-
     for (int i = 0; i < nb; i++) {
-        // Load elements into 4 AVX vectors
+        // Load elements into 8 SSE vectors
         __m128 v0 = _mm_loadu_ps( x );
         __m128 v1 = _mm_loadu_ps( x + 4 );
         __m128 v2 = _mm_loadu_ps( x + 8 );
@@ -1512,7 +1495,6 @@ static void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict 
     const int nb = k / qk;
 
 #if defined(__SSSE3__)
-    // sse tbd
     assert(qk == 32);
 
     const __m128i lowMask  = _mm_set1_epi8(0x0F);
@@ -1592,7 +1574,6 @@ static void dequantize_row_q4_1(const block_q4_1 * restrict x, float * restrict 
     const int nb = k / qk;
 
 #if defined(__SSSE3__)
-    // sse tbd
     assert(qk == 32);
 
     const __m128i lowMask  = _mm_set1_epi8(0x0F);
@@ -1724,7 +1705,6 @@ static void dequantize_row_q8_0(const void * restrict vx, float * restrict y, in
     const block_q8_0 * restrict x = vx;
 
 #if defined(__SSSE3__)
-    // SSE tbd
     assert(qk == 32);
 
     __m128 fx[8];
@@ -3051,7 +3031,6 @@ static void ggml_vec_dot_q5_0_q8_0(const int n, float * restrict s, const void *
     }
 
     *s = hsum_float_8(acc);
-// SSE tbd
 #else
     // scalar
     float sumf = 0.0;
@@ -3310,7 +3289,6 @@ static void ggml_vec_dot_q5_1_q8_1(const int n, float * restrict s, const void *
     }
 
     *s = hsum_float_8(acc) + summs;
-// SSE tbd
 #else
     // scalar
     float sumf = 0.0;
@@ -3423,7 +3401,6 @@ static void ggml_vec_dot_q8_0_q8_0(const int n, float * restrict s, const void *
 
     *s = hsum_float_8(acc);
 #elif defined(__SSSE3__)
-    // work here
     // Initialize accumulator with zeros
     __m128 acc = _mm_setzero_ps();
 
