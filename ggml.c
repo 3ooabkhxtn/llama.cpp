@@ -1178,7 +1178,7 @@ for (int i = 0; i < nb; i++) {
 
         // Quantize these floats
         const float d = maxScalar / 127.f;
-        y[i].d = d;
+        y[i].d = GGML_FP32_TO_FP16(d);
         const float id = ( maxScalar != 0.0f ) ? 127.f / maxScalar : 0.0f;
         const __m128 mul = _mm_set1_ps( id );
 
@@ -1447,7 +1447,7 @@ static void quantize_row_q8_1(const float * restrict x, void * restrict vy, int 
 
         // Quantize these floats
         const float d = maxScalar / 127.f;
-        y[i].d = d;
+        y[i].d = GGML_FP32_TO_FP16(d);
         const float id = ( maxScalar != 0.0f ) ? 127.f / maxScalar : 0.0f;
         const __m128 mul = _mm_set1_ps( id );
 
@@ -1520,9 +1520,11 @@ static void dequantize_row_q4_0(const block_q4_0 * restrict x, float * restrict 
 
     __m128 fx[8];
 
+    assert(sizeof(fx) == 8 * sizeof(__m128));
+
     int j = 0;
     for (int i = 0; i < nb; i++) {
-        const __m128 d = _mm_set1_ps(x[i].d);
+        const __m128 d = _mm_set1_ps(GGML_FP16_TO_FP32(x[i].d));
 
         const __m128i x_ = _mm_loadu_si128((const __m128i *)(x[i].qs));
 
@@ -1597,10 +1599,12 @@ static void dequantize_row_q4_1(const block_q4_1 * restrict x, float * restrict 
 
     __m128 fx[8];
 
+    assert(sizeof(fx) == 8 * sizeof(__m128));
+
     int j = 0;
     for (int i = 0; i < nb; i++) {
-        const __m128 d = _mm_set1_ps(x[i].d);
-        const __m128 m = _mm_set1_ps(x[i].m);
+        const __m128 d = _mm_set1_ps(GGML_FP16_TO_FP32(x[i].d));
+        const __m128 m = _mm_set1_ps(GGML_FP16_TO_FP32(x[i].m));
 
         const __m128i x_ = _mm_loadu_si128((const __m128i *)(x[i].qs));
 
@@ -1725,9 +1729,11 @@ static void dequantize_row_q8_0(const void * restrict vx, float * restrict y, in
 
     __m128 fx[8];
 
+    assert(sizeof(fx) == 8 * sizeof(__m128));
+
     int j = 0;
     for (int i = 0; i < nb; i++) {
-        const __m128 d = _mm_set1_ps(x[i].d);
+        const __m128 d = _mm_set1_ps(GGML_FP16_TO_FP32(x[i].d));
 
         const __m128i x0 = _mm_loadu_si128((const __m128i *)(x[i].qs));
         const __m128i x1 = _mm_loadu_si128((const __m128i *)(x[i].qs + 16));
@@ -2823,7 +2829,7 @@ static void ggml_vec_dot_q4_1_q8_1(const int n, float * restrict s, const void *
             sumi += (v0 * y[i].qs[j]) + (v1 * y[i].qs[j + qk/2]);
         }
 
-        sumf += (GGML_FP16_TO_FP32(x[i]).d*y[i].d)*sumi + GGML_FP16_TO_FP32(x[i].m)*y[i].s;
+        sumf += (GGML_FP16_TO_FP32(x[i].d)*y[i].d)*sumi + GGML_FP16_TO_FP32(x[i].m)*y[i].s;
     }
 
     *s = sumf;
@@ -3428,7 +3434,7 @@ static void ggml_vec_dot_q8_0_q8_0(const int n, float * restrict s, const void *
         _mm_prefetch(&y[i] + sizeof(block_q8_0), _MM_HINT_T0);
 
         // Compute combined scale for the block
-        const __m128 d = _mm_mul_ps( _mm_set1_ps( x[i].d ), _mm_set1_ps( y[i].d ) );
+        const __m128 d = _mm_mul_ps( _mm_set1_ps( GGML_FP16_TO_FP32(x[i].d) ), _mm_set1_ps( GGML_FP16_TO_FP32(y[i].d) ) );
 
         const __m128i bx_0 = _mm_loadu_si128((const __m128i *)x[i].qs);
         const __m128i by_0 = _mm_loadu_si128((const __m128i *)y[i].qs);
