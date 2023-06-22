@@ -28,7 +28,7 @@
           postPatch =
             if isM1 then ''
               substituteInPlace ./ggml-metal.m \
-                --replace '[[NSBundle mainBundle] pathForResource:@"ggml-metal" ofType:@"metal"];' "@\"$out/ggml-metal.metal\";"
+                --replace '[bundle pathForResource:@"ggml-metal" ofType:@"metal"];' "@\"$out/ggml-metal.metal\";"
             '' else "";
           nativeBuildInputs = with pkgs; [ cmake ];
           buildInputs = osSpecific;
@@ -48,6 +48,19 @@
           '';
           meta.mainProgram = "llama";
         };
+        apps.llama-server = {
+          type = "app";
+          program = "${self.packages.${system}.default}/bin/llama-server";
+        };
+        apps.llama-embedding = {
+          type = "app";
+          program = "${self.packages.${system}.default}/bin/embedding";
+        };
+        apps.llama = {
+          type = "app";
+          program = "${self.packages.${system}.default}/bin/llama";
+        };
+        apps.default = self.apps.${system}.llama;
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             cmake
